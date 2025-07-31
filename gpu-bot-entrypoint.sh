@@ -14,13 +14,13 @@ fi
 
 # Create self-termination script
 echo "Creating self-termination script..."
-cat > /workspace/self_terminate.sh << 'EOF'
+cat > /root/self_terminate.sh << 'EOF'
 #!/bin/bash
 echo "$(date): Starting self-termination for reservation $RESERVATION_ID"
 
 # Write termination status
 CONTAINER="${CONTAINER_ID:-$VAST_CONTAINERLABEL}"
-echo "{\"status\": \"terminating\", \"timestamp\": \"$(date --iso-8601=seconds)\", \"reservation_id\": \"$RESERVATION_ID\", \"container_id\": \"$CONTAINER\"}" > /workspace/instance_status.json
+echo "{\"status\": \"terminating\", \"timestamp\": \"$(date --iso-8601=seconds)\", \"reservation_id\": \"$RESERVATION_ID\", \"container_id\": \"$CONTAINER\"}" > /root/instance_status.json
 
 # Give 30 seconds for any cleanup
 echo "Waiting 30 seconds for cleanup..."
@@ -36,7 +36,7 @@ if [ $? -ne 0 ]; then
     sudo poweroff
 fi
 EOF
-chmod +x /workspace/self_terminate.sh
+chmod +x /root/self_terminate.sh
 
 # Schedule termination if RESERVATION_END_TIME is set
 if [ -n "$RESERVATION_END_TIME" ]; then
@@ -51,14 +51,14 @@ if [ -n "$RESERVATION_END_TIME" ]; then
         
         # Schedule using 'at' command
         if command -v at &> /dev/null; then
-            echo "/workspace/self_terminate.sh" | at now + $minutes_until_end minutes 2>/dev/null || true
+            echo "/root/self_terminate.sh" | at now + $minutes_until_end minutes 2>/dev/null || true
             echo "Scheduled with 'at' command"
         fi
         
         # Also add cron job as backup
         if command -v crontab &> /dev/null; then
             termination_time=$(date -d "$RESERVATION_END_TIME +5 minutes" +"%M %H %d %m")
-            (crontab -l 2>/dev/null || true; echo "$termination_time * /workspace/self_terminate.sh") | crontab -
+            (crontab -l 2>/dev/null || true; echo "$termination_time * /root/self_terminate.sh") | crontab -
             echo "Added cron backup"
         fi
     else
@@ -70,12 +70,12 @@ fi
 
 # Create monitoring/heartbeat script
 echo "Creating monitoring script..."
-cat > /workspace/monitor.sh << 'EOF'
+cat > /root/monitor.sh << 'EOF'
 #!/bin/bash
 while true; do
     # Write heartbeat
     CONTAINER="${CONTAINER_ID:-$VAST_CONTAINERLABEL}"
-    echo "{\"status\": \"running\", \"timestamp\": \"$(date --iso-8601=seconds)\", \"reservation_id\": \"$RESERVATION_ID\", \"container_id\": \"$CONTAINER\", \"uptime\": \"$(uptime -p)\"}" > /workspace/instance_status.json
+    echo "{\"status\": \"running\", \"timestamp\": \"$(date --iso-8601=seconds)\", \"reservation_id\": \"$RESERVATION_ID\", \"container_id\": \"$CONTAINER\", \"uptime\": \"$(uptime -p)\"}" > /root/instance_status.json
     
     # Check if past reservation end time
     if [ -n "$RESERVATION_END_TIME" ]; then
@@ -83,7 +83,7 @@ while true; do
         end=$(date -d "$RESERVATION_END_TIME" +%s 2>/dev/null || echo 0)
         if [ $end -gt 0 ] && [ $current -gt $end ]; then
             echo "Reservation time exceeded, triggering termination"
-            /workspace/self_terminate.sh
+            /root/self_terminate.sh
             exit 0
         fi
     fi
@@ -91,11 +91,11 @@ while true; do
     sleep 60
 done
 EOF
-chmod +x /workspace/monitor.sh
+chmod +x /root/monitor.sh
 
 # Start monitoring in background
 echo "Starting monitoring process..."
-nohup /workspace/monitor.sh > /var/log/reservation_monitor.log 2>&1 &
+nohup /root/monitor.sh > /var/log/reservation_monitor.log 2>&1 &
 
 # Export vLLM configuration
 echo "Configuring vLLM..."
@@ -114,8 +114,8 @@ fi
 echo "================================="
 
 # Write initial status
-echo "{\"status\": \"starting\", \"timestamp\": \"$(date --iso-8601=seconds)\", \"reservation_id\": \"$RESERVATION_ID\"}" > /workspace/instance_status.json
+echo "{\"status\": \"starting\", \"timestamp\": \"$(date --iso-8601=seconds)\", \"reservation_id\": \"$RESERVATION_ID\"}" > /root/instance_status.json
 
 # Start the default vLLM entrypoint
 echo "Starting vLLM..."
-exec /opt/entrypoint.sh
+exec /opt/instance-tools/bin/entrypoint.sh
