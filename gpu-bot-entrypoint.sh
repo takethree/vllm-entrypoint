@@ -1,0 +1,121 @@
+#!/bin/bash
+set -e
+
+echo "=== GPU Bot Entrypoint Script ==="
+echo "Reservation ID: $RESERVATION_ID"
+echo "Reservation End Time: $RESERVATION_END_TIME"
+echo "Container ID: ${CONTAINER_ID:-$VAST_CONTAINERLABEL}"
+
+# Install vast.ai CLI if not present
+if ! command -v vastai &> /dev/null; then
+    echo "Installing vast.ai CLI..."
+    pip install vastai
+fi
+
+# Create self-termination script
+echo "Creating self-termination script..."
+cat > /workspace/self_terminate.sh << 'EOF'
+#!/bin/bash
+echo "$(date): Starting self-termination for reservation $RESERVATION_ID"
+
+# Write termination status
+CONTAINER="${CONTAINER_ID:-$VAST_CONTAINERLABEL}"
+echo "{\"status\": \"terminating\", \"timestamp\": \"$(date --iso-8601=seconds)\", \"reservation_id\": \"$RESERVATION_ID\", \"container_id\": \"$CONTAINER\"}" > /workspace/instance_status.json
+
+# Give 30 seconds for any cleanup
+echo "Waiting 30 seconds for cleanup..."
+sleep 30
+
+# Terminate the instance
+echo "Executing vastai destroy command..."
+vastai destroy instance $CONTAINER
+
+# Fallback if vastai command fails
+if [ $? -ne 0 ]; then
+    echo "vastai destroy failed, attempting poweroff"
+    sudo poweroff
+fi
+EOF
+chmod +x /workspace/self_terminate.sh
+
+# Schedule termination if RESERVATION_END_TIME is set
+if [ -n "$RESERVATION_END_TIME" ]; then
+    # Calculate minutes until termination (with 5 minute buffer)
+    current_time=$(date +%s)
+    end_time=$(date -d "$RESERVATION_END_TIME" +%s 2>/dev/null || echo 0)
+    
+    if [ $end_time -gt 0 ] && [ $end_time -gt $current_time ]; then
+        minutes_until_end=$(( ($end_time - $current_time) / 60 + 5 ))
+        
+        echo "Scheduling termination for $RESERVATION_END_TIME (in $minutes_until_end minutes)"
+        
+        # Schedule using 'at' command
+        if command -v at &> /dev/null; then
+            echo "/workspace/self_terminate.sh" | at now + $minutes_until_end minutes 2>/dev/null || true
+            echo "Scheduled with 'at' command"
+        fi
+        
+        # Also add cron job as backup
+        if command -v crontab &> /dev/null; then
+            termination_time=$(date -d "$RESERVATION_END_TIME +5 minutes" +"%M %H %d %m")
+            (crontab -l 2>/dev/null || true; echo "$termination_time * /workspace/self_terminate.sh") | crontab -
+            echo "Added cron backup"
+        fi
+    else
+        echo "WARNING: Invalid or past RESERVATION_END_TIME"
+    fi
+else
+    echo "WARNING: No RESERVATION_END_TIME set - instance will not auto-terminate"
+fi
+
+# Create monitoring/heartbeat script
+echo "Creating monitoring script..."
+cat > /workspace/monitor.sh << 'EOF'
+#!/bin/bash
+while true; do
+    # Write heartbeat
+    CONTAINER="${CONTAINER_ID:-$VAST_CONTAINERLABEL}"
+    echo "{\"status\": \"running\", \"timestamp\": \"$(date --iso-8601=seconds)\", \"reservation_id\": \"$RESERVATION_ID\", \"container_id\": \"$CONTAINER\", \"uptime\": \"$(uptime -p)\"}" > /workspace/instance_status.json
+    
+    # Check if past reservation end time
+    if [ -n "$RESERVATION_END_TIME" ]; then
+        current=$(date +%s)
+        end=$(date -d "$RESERVATION_END_TIME" +%s 2>/dev/null || echo 0)
+        if [ $end -gt 0 ] && [ $current -gt $end ]; then
+            echo "Reservation time exceeded, triggering termination"
+            /workspace/self_terminate.sh
+            exit 0
+        fi
+    fi
+    
+    sleep 60
+done
+EOF
+chmod +x /workspace/monitor.sh
+
+# Start monitoring in background
+echo "Starting monitoring process..."
+nohup /workspace/monitor.sh > /var/log/reservation_monitor.log 2>&1 &
+
+# Export vLLM configuration
+echo "Configuring vLLM..."
+export VLLM_ARGS="--max-model-len 32768 --enforce-eager --download-dir /workspace/models --host 127.0.0.1 --port 18000 --quantization awq --gpu-memory-utilization 0.95 --max-num-seqs 256 --enable-prefix-caching --enable-chunked-prefill --api-key ${VLLM_API_KEY:-default-key} --served-model-name qwen-coder"
+export RAY_ARGS="--head --port 6379 --dashboard-host 127.0.0.1 --dashboard-port 28265"
+export PORTAL_CONFIG="localhost:1111:11111:/:Instance Portal|localhost:8000:18000:/docs:vLLM API|localhost:8265:28265:/:Ray Dashboard|localhost:8080:18080:/:Jupyter|localhost:8080:8080:/terminals/1:Jupyter Terminal|localhost:9090:19090:/metrics:Prometheus Metrics"
+
+# List scheduled termination jobs
+echo "=== Scheduled Termination Jobs ==="
+if command -v atq &> /dev/null; then
+    atq || echo "No 'at' jobs scheduled"
+fi
+if command -v crontab &> /dev/null; then
+    crontab -l 2>/dev/null || echo "No cron jobs scheduled"
+fi
+echo "================================="
+
+# Write initial status
+echo "{\"status\": \"starting\", \"timestamp\": \"$(date --iso-8601=seconds)\", \"reservation_id\": \"$RESERVATION_ID\"}" > /workspace/instance_status.json
+
+# Start the default vLLM entrypoint
+echo "Starting vLLM..."
+exec /opt/entrypoint.sh
