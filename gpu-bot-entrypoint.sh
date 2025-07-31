@@ -134,6 +134,19 @@ echo "================================="
 # Write initial status
 echo "{\"status\": \"starting\", \"timestamp\": \"$(date --iso-8601=seconds)\", \"reservation_id\": \"$RESERVATION_ID\"}" > /root/instance_status.json
 
-# Start the default vLLM entrypoint
+# Start vLLM directly (for vllm/vllm-openai image)
 echo "Starting vLLM..."
-exec /opt/instance-tools/bin/entrypoint.sh
+cd /root
+
+# Start vLLM with the configured model
+if command -v vllm &> /dev/null; then
+    echo "Starting vLLM with model: $VLLM_MODEL"
+    exec vllm serve "$VLLM_MODEL" \
+        --host 0.0.0.0 \
+        --port 8000 \
+        $(echo $VLLM_ARGS)
+else
+    echo "ERROR: vLLM command not found!"
+    echo "This entrypoint script requires the vllm/vllm-openai Docker image"
+    exit 1
+fi
