@@ -97,9 +97,27 @@ chmod +x /root/monitor.sh
 echo "Starting monitoring process..."
 nohup /root/monitor.sh > /var/log/reservation_monitor.log 2>&1 &
 
-# Export vLLM configuration
+# Export vLLM configuration based on GPU count
 echo "Configuring vLLM..."
-export VLLM_ARGS="--max-model-len 32000 --enforce-eager --download-dir /workspace/models --host 127.0.0.1 --port 18000 --gpu-memory-utilization 0.95 --max-num-seqs 256 --enable-prefix-caching --enable-chunked-prefill --api-key ${VLLM_API_KEY:-default-key} --served-model-name qwen-coder --enable-auto-tool-choice --tool-call-parser qwen3_coder"
+GPU_COUNT=$(nvidia-smi -L | wc -l)
+echo "Detected $GPU_COUNT GPUs"
+
+# Select model based on GPU count
+if [ $GPU_COUNT -eq 8 ]; then
+    echo "Using Qwen3-Coder-480B for 8x GPU configuration"
+    export VLLM_MODEL="Qwen/Qwen3-Coder-480B-A35B-Instruct"
+    export VLLM_ARGS="--max-model-len 32000 --enforce-eager --download-dir /workspace/models --host 127.0.0.1 --port 18000 --gpu-memory-utilization 0.95 --max-num-seqs 256 --enable-prefix-caching --enable-chunked-prefill --api-key ${VLLM_API_KEY:-default-key} --served-model-name qwen-coder --enable-auto-tool-choice --tool-call-parser qwen3_coder"
+elif [ $GPU_COUNT -eq 4 ]; then
+    echo "Using Qwen3-Coder-32B for 4x GPU configuration"
+    export VLLM_MODEL="Qwen/Qwen3-Coder-32B-Instruct"
+    export VLLM_ARGS="--max-model-len 32000 --enforce-eager --download-dir /workspace/models --host 127.0.0.1 --port 18000 --gpu-memory-utilization 0.95 --max-num-seqs 256 --enable-prefix-caching --enable-chunked-prefill --api-key ${VLLM_API_KEY:-default-key} --served-model-name qwen-coder --enable-auto-tool-choice --tool-call-parser qwen3_coder"
+else
+    echo "Using Qwen3-Coder-7B for 2x GPU configuration"
+    export VLLM_MODEL="Qwen/Qwen3-Coder-7B-Instruct"
+    export VLLM_ARGS="--max-model-len 16384 --enforce-eager --download-dir /workspace/models --host 127.0.0.1 --port 18000 --gpu-memory-utilization 0.95 --max-num-seqs 256 --enable-prefix-caching --enable-chunked-prefill --api-key ${VLLM_API_KEY:-default-key} --served-model-name qwen-coder --enable-auto-tool-choice --tool-call-parser qwen3_coder"
+fi
+
+echo "Selected model: $VLLM_MODEL"
 export RAY_ARGS="--head --port 6379 --dashboard-host 127.0.0.1 --dashboard-port 28265"
 export PORTAL_CONFIG="localhost:1111:11111:/:Instance Portal|localhost:8000:18000:/docs:vLLM API|localhost:8265:28265:/:Ray Dashboard|localhost:8080:18080:/:Jupyter|localhost:8080:8080:/terminals/1:Jupyter Terminal|localhost:9090:19090:/metrics:Prometheus Metrics"
 
