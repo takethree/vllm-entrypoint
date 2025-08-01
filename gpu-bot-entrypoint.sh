@@ -6,6 +6,17 @@ echo "Reservation ID: $RESERVATION_ID"
 echo "Reservation End Time: $RESERVATION_END_TIME"
 echo "Container ID: ${CONTAINER_ID:-$VAST_CONTAINERLABEL}"
 
+# Debug: Print all environment variables
+echo "=== Environment Variables Debug ==="
+env | grep -E "RESERVATION|VAST|CONTAINER" | sort
+echo "=================================="
+
+# Export RESERVATION_* variables to /etc/environment so they persist in SSH sessions
+echo "Exporting RESERVATION_* variables to /etc/environment..."
+env | grep ^RESERVATION_ >> /etc/environment || true
+# Also export them for the current session
+export $(env | grep ^RESERVATION_ | xargs) 2>/dev/null || true
+
 # Install vast.ai CLI if not present
 if ! command -v vastai &> /dev/null; then
     echo "Installing vast.ai CLI..."
@@ -38,7 +49,21 @@ fi
 EOF
 chmod +x /root/self_terminate.sh
 
-# Schedule termination if RESERVATION_END_TIME is set
+# Try to get RESERVATION_END_TIME from multiple sources
+if [ -z "$RESERVATION_END_TIME" ]; then
+    # Check if it's in a file (in case vast.ai writes env vars to a file)
+    if [ -f "/etc/environment" ]; then
+        source /etc/environment 2>/dev/null || true
+    fi
+    
+    # Check if it's passed as a different env var name
+    if [ -n "$EXTRA_ENV_RESERVATION_END_TIME" ]; then
+        RESERVATION_END_TIME="$EXTRA_ENV_RESERVATION_END_TIME"
+        echo "Found RESERVATION_END_TIME in EXTRA_ENV_RESERVATION_END_TIME"
+    fi
+fi
+
+# Schedule termination
 if [ -n "$RESERVATION_END_TIME" ]; then
     # Calculate minutes until termination (with 5 minute buffer)
     current_time=$(date +%s)
@@ -65,7 +90,17 @@ if [ -n "$RESERVATION_END_TIME" ]; then
         echo "WARNING: Invalid or past RESERVATION_END_TIME"
     fi
 else
-    echo "WARNING: No RESERVATION_END_TIME set - instance will not auto-terminate"
+    echo "WARNING: No RESERVATION_END_TIME set - defaulting to 2 hour termination"
+    # Default to 2 hours from now
+    minutes_until_end=125  # 2 hours + 5 minute buffer
+    
+    echo "Scheduling default termination in $minutes_until_end minutes"
+    
+    # Schedule using 'at' command
+    if command -v at &> /dev/null; then
+        echo "/root/self_terminate.sh" | at now + $minutes_until_end minutes 2>/dev/null || true
+        echo "Scheduled with 'at' command"
+    fi
 fi
 
 # Create monitoring/heartbeat script
@@ -107,19 +142,19 @@ if [ $GPU_COUNT -eq 8 ]; then
     echo "Using Qwen3-Coder-30B (full BF16) for 8x GPU configuration"
     export VLLM_MODEL="Qwen/Qwen3-Coder-30B-A3B-Instruct"
     # No need for DeepGEMM with BF16 model
-    export VLLM_ARGS="--tensor-parallel-size 8 --enable-expert-parallel --max-model-len 131072 --enforce-eager --download-dir /workspace/models --host 127.0.0.1 --port 18000 --gpu-memory-utilization 0.9 --max-num-batched-tokens 16384 --max-num-seqs 256 --enable-prefix-caching --enable-chunked-prefill --api-key ${VLLM_API_KEY:-default-key} --served-model-name qwen-coder --enable-auto-tool-choice --tool-call-parser qwen3_coder"
+    export VLLM_ARGS="--tensor-parallel-size 8 --max-model-len 131072 --enforce-eager --download-dir /workspace/models --host 127.0.0.1 --port 18000 --gpu-memory-utilization 0.9 --max-num-batched-tokens 16384 --max-num-seqs 256 --enable-prefix-caching --enable-chunked-prefill --api-key ${VLLM_API_KEY:-default-key} --served-model-name qwen-coder --enable-auto-tool-choice --tool-call-parser qwen3_coder"
 elif [ $GPU_COUNT -eq 4 ]; then
     echo "Using Qwen3-Coder-30B-FP8 for 4x GPU configuration"
     # Enable DeepGEMM for FP8 models
     export VLLM_USE_DEEP_GEMM=1
     export VLLM_MODEL="Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8"
-    export VLLM_ARGS="--tensor-parallel-size 4 --enable-expert-parallel --max-model-len 65536 --enforce-eager --download-dir /workspace/models --host 127.0.0.1 --port 18000 --gpu-memory-utilization 0.9 --max-num-batched-tokens 8192 --max-num-seqs 256 --enable-prefix-caching --enable-chunked-prefill --api-key ${VLLM_API_KEY:-default-key} --served-model-name qwen-coder --enable-auto-tool-choice --tool-call-parser qwen3_coder"
+    export VLLM_ARGS="--tensor-parallel-size 4 --max-model-len 131072 --enforce-eager --download-dir /workspace/models --host 127.0.0.1 --port 18000 --gpu-memory-utilization 0.9 --max-num-batched-tokens 8192 --max-num-seqs 256 --enable-prefix-caching --enable-chunked-prefill --api-key ${VLLM_API_KEY:-default-key} --served-model-name qwen-coder --enable-auto-tool-choice --tool-call-parser qwen3_coder"
 else
     echo "Using Qwen3-Coder-30B-FP8 for 2x GPU configuration"
     # Enable DeepGEMM for FP8 models
     export VLLM_USE_DEEP_GEMM=1
     export VLLM_MODEL="Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8"
-    export VLLM_ARGS="--tensor-parallel-size 2 --enable-expert-parallel --max-model-len 32768 --enforce-eager --download-dir /workspace/models --host 127.0.0.1 --port 18000 --gpu-memory-utilization 0.9 --max-num-batched-tokens 8192 --max-num-seqs 256 --enable-prefix-caching --enable-chunked-prefill --api-key ${VLLM_API_KEY:-default-key} --served-model-name qwen-coder --enable-auto-tool-choice --tool-call-parser qwen3_coder"
+    export VLLM_ARGS="--tensor-parallel-size 2 --max-model-len 131072 --enforce-eager --download-dir /workspace/models --host 127.0.0.1 --port 18000 --gpu-memory-utilization 0.9 --max-num-batched-tokens 8192 --max-num-seqs 256 --enable-prefix-caching --enable-chunked-prefill --api-key ${VLLM_API_KEY:-default-key} --served-model-name qwen-coder --enable-auto-tool-choice --tool-call-parser qwen3_coder"
 fi
 
 echo "Selected model: $VLLM_MODEL"
@@ -143,9 +178,15 @@ echo "{\"status\": \"starting\", \"timestamp\": \"$(date --iso-8601=seconds)\", 
 echo "Starting vLLM..."
 cd /root
 
+# Export environment variables to help with model download
+export HF_HUB_ENABLE_HF_TRANSFER=1
+export VLLM_USE_MODELSCOPE=0
+export HF_HUB_DISABLE_PROGRESS_BARS=0
+
 # Start vLLM with the configured model
 if command -v vllm &> /dev/null; then
     echo "Starting vLLM with model: $VLLM_MODEL"
+    echo "This may take several minutes to download the model on first run..."
     exec vllm serve "$VLLM_MODEL" \
         --host 0.0.0.0 \
         --port 8000 \
