@@ -107,19 +107,19 @@ if [ $GPU_COUNT -eq 8 ]; then
     echo "Using Qwen3-Coder-30B (full BF16) for 8x GPU configuration"
     export VLLM_MODEL="Qwen/Qwen3-Coder-30B-A3B-Instruct"
     # No need for DeepGEMM with BF16 model
-    export VLLM_ARGS="--tensor-parallel-size 8 --enable-expert-parallel --max-model-len 131072 --enforce-eager --download-dir /workspace/models --host 127.0.0.1 --port 18000 --gpu-memory-utilization 0.9 --max-num-batched-tokens 16384 --max-num-seqs 256 --enable-prefix-caching --enable-chunked-prefill --api-key ${VLLM_API_KEY:-default-key} --served-model-name qwen-coder --enable-auto-tool-choice --tool-call-parser qwen3_coder --temperature 0.7 --top-p 0.8 --top-k 20 --repetition-penalty 1.05"
+    export VLLM_ARGS="--tensor-parallel-size 8 --enable-expert-parallel --max-model-len 131072 --enforce-eager --download-dir /workspace/models --host 127.0.0.1 --port 18000 --gpu-memory-utilization 0.9 --max-num-batched-tokens 16384 --max-num-seqs 256 --enable-prefix-caching --enable-chunked-prefill --api-key ${VLLM_API_KEY:-default-key} --served-model-name qwen-coder --enable-auto-tool-choice --tool-call-parser qwen3_coder"
 elif [ $GPU_COUNT -eq 4 ]; then
     echo "Using Qwen3-Coder-30B-FP8 for 4x GPU configuration"
     # Enable DeepGEMM for FP8 models
     export VLLM_USE_DEEP_GEMM=1
     export VLLM_MODEL="Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8"
-    export VLLM_ARGS="--tensor-parallel-size 4 --enable-expert-parallel --max-model-len 65536 --enforce-eager --download-dir /workspace/models --host 127.0.0.1 --port 18000 --gpu-memory-utilization 0.9 --max-num-batched-tokens 8192 --max-num-seqs 256 --enable-prefix-caching --enable-chunked-prefill --api-key ${VLLM_API_KEY:-default-key} --served-model-name qwen-coder --enable-auto-tool-choice --tool-call-parser qwen3_coder --temperature 0.7 --top-p 0.8 --top-k 20 --repetition-penalty 1.05"
+    export VLLM_ARGS="--tensor-parallel-size 4 --enable-expert-parallel --max-model-len 65536 --enforce-eager --download-dir /workspace/models --host 127.0.0.1 --port 18000 --gpu-memory-utilization 0.9 --max-num-batched-tokens 8192 --max-num-seqs 256 --enable-prefix-caching --enable-chunked-prefill --api-key ${VLLM_API_KEY:-default-key} --served-model-name qwen-coder --enable-auto-tool-choice --tool-call-parser qwen3_coder"
 else
     echo "Using Qwen3-Coder-30B-FP8 for 2x GPU configuration"
     # Enable DeepGEMM for FP8 models
     export VLLM_USE_DEEP_GEMM=1
     export VLLM_MODEL="Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8"
-    export VLLM_ARGS="--tensor-parallel-size 2 --enable-expert-parallel --max-model-len 32768 --enforce-eager --download-dir /workspace/models --host 127.0.0.1 --port 18000 --gpu-memory-utilization 0.9 --max-num-batched-tokens 8192 --max-num-seqs 256 --enable-prefix-caching --enable-chunked-prefill --api-key ${VLLM_API_KEY:-default-key} --served-model-name qwen-coder --enable-auto-tool-choice --tool-call-parser qwen3_coder --temperature 0.7 --top-p 0.8 --top-k 20 --repetition-penalty 1.05"
+    export VLLM_ARGS="--tensor-parallel-size 2 --enable-expert-parallel --max-model-len 32768 --enforce-eager --download-dir /workspace/models --host 127.0.0.1 --port 18000 --gpu-memory-utilization 0.9 --max-num-batched-tokens 8192 --max-num-seqs 256 --enable-prefix-caching --enable-chunked-prefill --api-key ${VLLM_API_KEY:-default-key} --served-model-name qwen-coder --enable-auto-tool-choice --tool-call-parser qwen3_coder"
 fi
 
 echo "Selected model: $VLLM_MODEL"
