@@ -177,6 +177,28 @@ cd /root
 export HF_HUB_ENABLE_HF_TRANSFER=1
 export VLLM_USE_MODELSCOPE=0
 export HF_HUB_DISABLE_PROGRESS_BARS=0
+# Use fork instead of spawn to avoid multiprocessing issues
+export VLLM_WORKER_MULTIPROC_METHOD=fork
+# Ensure vLLM uses the same cache directory as our pre-download
+export HF_HOME=/root/.cache/huggingface
+export HUGGINGFACE_HUB_CACHE=/root/.cache/huggingface
+
+# Pre-download model if using tensor parallelism to avoid multiprocessing issues
+if [[ "$VLLM_ARGS" == *"--tensor-parallel-size"* ]]; then
+    echo "Tensor parallelism detected. Pre-downloading model to avoid multiprocessing conflicts..."
+    echo "Using huggingface-cli for download (this may show high CPU usage but will complete)..."
+    
+    # Check if model already exists
+    if huggingface-cli scan-cache --dir /root/.cache/huggingface | grep -q "$VLLM_MODEL"; then
+        echo "Model $VLLM_MODEL already cached, skipping download"
+    else
+        echo "Downloading $VLLM_MODEL..."
+        # Use huggingface-cli which works even with high CPU usage
+        huggingface-cli download "$VLLM_MODEL" --cache-dir /root/.cache/huggingface || {
+            echo "Warning: Pre-download failed, continuing anyway..."
+        }
+    fi
+fi
 
 # Start vLLM with the configured model
 if command -v vllm &> /dev/null; then
