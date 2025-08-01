@@ -139,17 +139,17 @@ echo "Detected $GPU_COUNT GPUs"
 
 # Select model and configuration based on GPU count
 if [ $GPU_COUNT -eq 8 ]; then
-    echo "Using Qwen3-Coder-30B for 8x GPU configuration"
+    echo "Using Qwen3-Coder-30B for 8x GPU configuration with tensor parallelism"
     export VLLM_MODEL="Qwen/Qwen3-Coder-30B-A3B-Instruct"
-    export VLLM_ARGS="--max-model-len 131072 --enforce-eager --download-dir /workspace/models --host 127.0.0.1 --port 18000 --gpu-memory-utilization 0.95 --max-num-seqs 64 --enable-prefix-caching --enable-chunked-prefill --api-key ${VLLM_API_KEY:-default-key} --served-model-name qwen-coder --enable-auto-tool-choice --tool-call-parser qwen3_coder"
+    export VLLM_ARGS="--tensor-parallel-size 8 --max-model-len 131072 --enforce-eager --download-dir /workspace/models --host 127.0.0.1 --port 18000 --gpu-memory-utilization 0.95 --max-num-seqs 64 --enable-prefix-caching --enable-chunked-prefill --api-key ${VLLM_API_KEY:-default-key} --served-model-name qwen-coder --enable-auto-tool-choice --tool-call-parser qwen3_coder"
 elif [ $GPU_COUNT -eq 4 ]; then
-    echo "Using Qwen3-Coder-30B for 4x GPU configuration"
+    echo "Using Qwen3-Coder-30B for 4x GPU configuration with tensor parallelism"
     export VLLM_MODEL="Qwen/Qwen3-Coder-30B-A3B-Instruct"
-    export VLLM_ARGS="--max-model-len 131072 --enforce-eager --download-dir /workspace/models --host 127.0.0.1 --port 18000 --gpu-memory-utilization 0.95 --max-num-seqs 64 --enable-prefix-caching --enable-chunked-prefill --api-key ${VLLM_API_KEY:-default-key} --served-model-name qwen-coder --enable-auto-tool-choice --tool-call-parser qwen3_coder"
+    export VLLM_ARGS="--tensor-parallel-size 4 --max-model-len 131072 --enforce-eager --download-dir /workspace/models --host 127.0.0.1 --port 18000 --gpu-memory-utilization 0.95 --max-num-seqs 64 --enable-prefix-caching --enable-chunked-prefill --api-key ${VLLM_API_KEY:-default-key} --served-model-name qwen-coder --enable-auto-tool-choice --tool-call-parser qwen3_coder"
 else
-    echo "Using Qwen3-Coder-30B for 2x GPU configuration"
+    echo "Using Qwen3-Coder-30B for 2x GPU configuration with tensor parallelism"
     export VLLM_MODEL="Qwen/Qwen3-Coder-30B-A3B-Instruct"
-    export VLLM_ARGS="--max-model-len 131072 --enforce-eager --download-dir /workspace/models --host 127.0.0.1 --port 18000 --gpu-memory-utilization 0.95 --max-num-seqs 32 --enable-prefix-caching --enable-chunked-prefill --api-key ${VLLM_API_KEY:-default-key} --served-model-name qwen-coder --enable-auto-tool-choice --tool-call-parser qwen3_coder"
+    export VLLM_ARGS="--tensor-parallel-size 2 --max-model-len 131072 --enforce-eager --download-dir /workspace/models --host 127.0.0.1 --port 18000 --gpu-memory-utilization 0.95 --max-num-seqs 32 --enable-prefix-caching --enable-chunked-prefill --api-key ${VLLM_API_KEY:-default-key} --served-model-name qwen-coder --enable-auto-tool-choice --tool-call-parser qwen3_coder"
 fi
 
 echo "Selected model: $VLLM_MODEL"
