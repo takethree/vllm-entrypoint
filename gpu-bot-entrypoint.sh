@@ -106,15 +106,15 @@ echo "Detected $GPU_COUNT GPUs"
 if [ $GPU_COUNT -eq 8 ]; then
     echo "Using Qwen3-Coder-480B for 8x GPU configuration"
     export VLLM_MODEL="Qwen/Qwen3-Coder-480B-A35B-Instruct"
-    export VLLM_ARGS="--max-model-len 32000 --enforce-eager --download-dir /workspace/models --host 127.0.0.1 --port 18000 --gpu-memory-utilization 0.95 --max-num-seqs 256 --enable-prefix-caching --enable-chunked-prefill --api-key ${VLLM_API_KEY:-default-key} --served-model-name qwen-coder --tool-call-parser qwen3_coder"
+    export VLLM_ARGS="--max-model-len 131072 --enforce-eager --download-dir /workspace/models --host 127.0.0.1 --port 18000 --gpu-memory-utilization 0.95 --max-num-seqs 64 --enable-prefix-caching --enable-chunked-prefill --api-key ${VLLM_API_KEY:-default-key} --served-model-name qwen-coder --tool-call-parser qwen3_coder"
 elif [ $GPU_COUNT -eq 4 ]; then
     echo "Using Qwen3-Coder-30B for 4x GPU configuration"
     export VLLM_MODEL="Qwen/Qwen3-Coder-30B-A3B-Instruct"
-    export VLLM_ARGS="--max-model-len 32000 --enforce-eager --download-dir /workspace/models --host 127.0.0.1 --port 18000 --gpu-memory-utilization 0.95 --max-num-seqs 256 --enable-prefix-caching --enable-chunked-prefill --api-key ${VLLM_API_KEY:-default-key} --served-model-name qwen-coder --tool-call-parser qwen3_coder"
+    export VLLM_ARGS="--max-model-len 131072 --enforce-eager --download-dir /workspace/models --host 127.0.0.1 --port 18000 --gpu-memory-utilization 0.95 --max-num-seqs 64 --enable-prefix-caching --enable-chunked-prefill --api-key ${VLLM_API_KEY:-default-key} --served-model-name qwen-coder --tool-call-parser qwen3_coder"
 else
     echo "Using Qwen3-Coder-30B for 2x GPU configuration"
     export VLLM_MODEL="Qwen/Qwen3-Coder-30B-A3B-Instruct"
-    export VLLM_ARGS="--max-model-len 65536 --enforce-eager --download-dir /workspace/models --host 127.0.0.1 --port 18000 --gpu-memory-utilization 0.95 --max-num-seqs 64 --enable-prefix-caching --enable-chunked-prefill --api-key ${VLLM_API_KEY:-default-key} --served-model-name qwen-coder --tool-call-parser qwen3_coder"
+    export VLLM_ARGS="--max-model-len 131072 --enforce-eager --download-dir /workspace/models --host 127.0.0.1 --port 18000 --gpu-memory-utilization 0.95 --max-num-seqs 32 --enable-prefix-caching --enable-chunked-prefill --api-key ${VLLM_API_KEY:-default-key} --served-model-name qwen-coder --tool-call-parser qwen3_coder"
 fi
 
 echo "Selected model: $VLLM_MODEL"
