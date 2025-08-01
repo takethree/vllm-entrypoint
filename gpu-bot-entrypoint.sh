@@ -141,15 +141,15 @@ echo "Detected $GPU_COUNT GPUs"
 if [ $GPU_COUNT -eq 8 ]; then
     echo "Using Qwen3-Coder-30B for 8x GPU configuration with tensor parallelism"
     export VLLM_MODEL="Qwen/Qwen3-Coder-30B-A3B-Instruct"
-    export VLLM_ARGS="--tensor-parallel-size 8 --max-model-len 131072 --enforce-eager --host 127.0.0.1 --port 18000 --gpu-memory-utilization 0.95 --max-num-seqs 64 --enable-prefix-caching --enable-chunked-prefill --api-key ${VLLM_API_KEY:-default-key} --served-model-name qwen-coder --enable-auto-tool-choice --tool-call-parser qwen3_coder"
+    export VLLM_ARGS="--tensor-parallel-size 8 --max-model-len 32000 --gpu-memory-utilization 0.95 --api-key ${VLLM_API_KEY:-default-key} --served-model-name qwen-coder --enable-auto-tool-choice --tool-call-parser qwen3_coder"
 elif [ $GPU_COUNT -eq 4 ]; then
     echo "Using Qwen3-Coder-30B for 4x GPU configuration with tensor parallelism"
     export VLLM_MODEL="Qwen/Qwen3-Coder-30B-A3B-Instruct"
-    export VLLM_ARGS="--tensor-parallel-size 4 --max-model-len 131072 --enforce-eager --host 127.0.0.1 --port 18000 --gpu-memory-utilization 0.95 --max-num-seqs 64 --enable-prefix-caching --enable-chunked-prefill --api-key ${VLLM_API_KEY:-default-key} --served-model-name qwen-coder --enable-auto-tool-choice --tool-call-parser qwen3_coder"
+    export VLLM_ARGS="--tensor-parallel-size 4 --max-model-len 32000 --gpu-memory-utilization 0.95 --api-key ${VLLM_API_KEY:-default-key} --served-model-name qwen-coder --enable-auto-tool-choice --tool-call-parser qwen3_coder"
 else
     echo "Using Qwen3-Coder-30B for 2x GPU configuration with tensor parallelism"
     export VLLM_MODEL="Qwen/Qwen3-Coder-30B-A3B-Instruct"
-    export VLLM_ARGS="--tensor-parallel-size 2 --max-model-len 131072 --enforce-eager --host 127.0.0.1 --port 18000 --gpu-memory-utilization 0.95 --max-num-seqs 32 --enable-prefix-caching --enable-chunked-prefill --api-key ${VLLM_API_KEY:-default-key} --served-model-name qwen-coder --enable-auto-tool-choice --tool-call-parser qwen3_coder"
+    export VLLM_ARGS="--tensor-parallel-size 2 --max-model-len 32000 --gpu-memory-utilization 0.95 --api-key ${VLLM_API_KEY:-default-key} --served-model-name qwen-coder --enable-auto-tool-choice --tool-call-parser qwen3_coder"
 fi
 
 echo "Selected model: $VLLM_MODEL"
@@ -193,10 +193,16 @@ if [[ "$VLLM_ARGS" == *"--tensor-parallel-size"* ]]; then
         echo "Model $VLLM_MODEL already cached, skipping download"
     else
         echo "Downloading $VLLM_MODEL..."
-        # Use huggingface-cli which works even with high CPU usage
-        huggingface-cli download "$VLLM_MODEL" --cache-dir /root/.cache/huggingface || {
-            echo "Warning: Pre-download failed, continuing anyway..."
-        }
+        # Use hf (new command) or fall back to huggingface-cli
+        if command -v hf &> /dev/null; then
+            hf download "$VLLM_MODEL" --cache-dir /root/.cache/huggingface || {
+                echo "Warning: Pre-download failed, continuing anyway..."
+            }
+        else
+            huggingface-cli download "$VLLM_MODEL" --cache-dir /root/.cache/huggingface || {
+                echo "Warning: Pre-download failed, continuing anyway..."
+            }
+        fi
     fi
 fi
 
@@ -206,7 +212,7 @@ if command -v vllm &> /dev/null; then
     echo "This may take several minutes to download the model on first run..."
     exec vllm serve "$VLLM_MODEL" \
         --host 0.0.0.0 \
-        --port 8000 \
+        --port 18000 \
         $(echo $VLLM_ARGS)
 else
     echo "ERROR: vLLM command not found!"
