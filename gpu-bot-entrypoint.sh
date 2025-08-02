@@ -141,15 +141,15 @@ echo "Detected $GPU_COUNT GPUs"
 if [ $GPU_COUNT -eq 8 ]; then
     echo "Using Qwen3-Coder-30B for 8x GPU configuration with tensor parallelism"
     export VLLM_MODEL="Qwen/Qwen3-Coder-30B-A3B-Instruct"
-    export VLLM_ARGS="--tensor-parallel-size 8 --max-model-len 256000 --gpu-memory-utilization 0.95 --api-key ${VLLM_API_KEY:-default-key} --served-model-name qwen-coder --enable-auto-tool-choice --tool-call-parser qwen3_coder"
+    export VLLM_ARGS="--tensor-parallel-size 8 --trust-remote-code --dtype float16 --max-model-len 262144 --gpu-memory-utilization 0.95 --enable-chunked-prefill --enable-prefix-caching --api-key ${VLLM_API_KEY:-default-key} --served-model-name qwen-coder --enable-auto-tool-choice --tool-call-parser qwen3_coder"
 elif [ $GPU_COUNT -eq 4 ]; then
     echo "Using Qwen3-Coder-30B for 4x GPU configuration with tensor parallelism"
     export VLLM_MODEL="Qwen/Qwen3-Coder-30B-A3B-Instruct"
-    export VLLM_ARGS="--tensor-parallel-size 4 --max-model-len 256000 --gpu-memory-utilization 0.95 --api-key ${VLLM_API_KEY:-default-key} --served-model-name qwen-coder --enable-auto-tool-choice --tool-call-parser qwen3_coder"
+    export VLLM_ARGS="--tensor-parallel-size 4 --dtype float16 --max-model-len 262144 --gpu-memory-utilization 0.95 --max-num-batched-tokens 32768 --enable-chunked-prefill --disable-log-requests --api-key ${VLLM_API_KEY:-default-key} --served-model-name qwen-coder --enable-auto-tool-choice --tool-call-parser qwen3_coder"
 else
     echo "Using Qwen3-Coder-30B for 2x GPU configuration with tensor parallelism"
-    export VLLM_MODEL="Qwen/Qwen3-Coder-30B-A3B-Instruct"
-    export VLLM_ARGS="--tensor-parallel-size 2 --max-model-len 256000 --gpu-memory-utilization 0.95 --api-key ${VLLM_API_KEY:-default-key} --served-model-name qwen-coder --enable-auto-tool-choice --tool-call-parser qwen3_coder"
+    export VLLM_MODEL="Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8"
+    export VLLM_ARGS="--tensor-parallel-size 2 --quantization fp8 --kv-cache-dtype fp8 --max-model-len 262144 --rope-scaling '{\"rope_type\":\"yarn\",\"factor\":8.0,\"original_max_position_embeddings\":32768}' --gpu-memory-utilization 0.90 --trust-remote-code --api-key ${VLLM_API_KEY:-default-key} --served-model-name qwen-coder --enable-auto-tool-choice --tool-call-parser qwen3_coder"
 fi
 
 echo "Selected model: $VLLM_MODEL"
@@ -182,6 +182,28 @@ export VLLM_WORKER_MULTIPROC_METHOD=fork
 # Ensure vLLM uses the same cache directory as our pre-download
 export HF_HOME=/root/.cache/huggingface
 export HUGGINGFACE_HUB_CACHE=/root/.cache/huggingface
+
+# Environment setup for performance and stability
+if [ $GPU_COUNT -eq 8 ]; then
+    # Special environment setup for 8x GPU configuration
+    export VLLM_SKIP_P2P_CHECK=1                         # Skip GPU peer-to-peer access check (avoids multi-GPU init errors)
+    export VLLM_FLASH_ATTN_VERSION=2                     # Force FlashAttention v2 (H200/Blackwell support)
+    export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True  # Use expandable segments to reduce CUDA fragmentation
+    # Optional debugging flags (commented out by default)
+    # export NCCL_ASYNC_ERROR_HANDLING=1                 # Enable async error handling in NCCL
+    # export NCCL_P2P_DISABLE=1                          # Disable direct NCCL P2P if encountering NVLink issues
+    export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7          # Explicitly set all 8 GPUs
+elif [ $GPU_COUNT -eq 2 ]; then
+    # Environment setup for 2x GPU with FP8
+    export CUDA_LAUNCH_BLOCKING=1                        # Ensure correct sync for multi-GPU FP8
+    export PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True,max_split_size_mb:512"  # Optimize CUDA allocator to reduce fragmentation
+    export VLLM_USE_TRITON_FLASH_ATTN=1                  # Use Triton-based FlashAttention for speed
+    export VLLM_FLASH_ATTN_VERSION=3                     # Force FlashAttention-3 for long contexts
+else
+    # Default environment setup for 4x GPU
+    export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True  # Use expandable segments to reduce CUDA fragmentation
+    export VLLM_FLASH_ATTN_VERSION=2                     # FlashAttention v2 for stability
+fi
 
 # Pre-download model if using tensor parallelism to avoid multiprocessing issues
 if [[ "$VLLM_ARGS" == *"--tensor-parallel-size"* ]]; then
