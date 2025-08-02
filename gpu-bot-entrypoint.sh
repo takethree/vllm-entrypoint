@@ -145,7 +145,7 @@ if [ $GPU_COUNT -eq 8 ]; then
 elif [ $GPU_COUNT -eq 4 ]; then
     echo "Using Qwen3-Coder-30B for 4x GPU configuration with tensor parallelism"
     export VLLM_MODEL="Qwen/Qwen3-Coder-30B-A3B-Instruct"
-    export VLLM_ARGS="--tensor-parallel-size 4 --dtype float16 --max-model-len 262144 --gpu-memory-utilization 0.95 --max-num-batched-tokens 32768 --enable-chunked-prefill --disable-log-requests --api-key ${VLLM_API_KEY:-default-key} --served-model-name qwen-coder --enable-auto-tool-choice --tool-call-parser qwen3_coder"
+    export VLLM_ARGS="--tensor-parallel-size 4 --dtype float16 --max-model-len 262144 --gpu-memory-utilization 0.95 --max-num-batched-tokens 32768 --enable-chunked-prefill --disable-log-requests --disable-custom-all-reduce --api-key ${VLLM_API_KEY:-default-key} --served-model-name qwen-coder --enable-auto-tool-choice --tool-call-parser qwen3_coder"
 else
     echo "Using Qwen3-Coder-30B for 2x GPU configuration with tensor parallelism"
     export VLLM_MODEL="Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8"
