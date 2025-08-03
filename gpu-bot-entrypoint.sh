@@ -141,15 +141,52 @@ echo "Detected $GPU_COUNT GPUs"
 if [ $GPU_COUNT -eq 8 ]; then
     echo "Using Qwen3-Coder-30B for 8x GPU configuration with tensor parallelism"
     export VLLM_MODEL="Qwen/Qwen3-Coder-30B-A3B-Instruct"
-    export VLLM_ARGS="--tensor-parallel-size 8 --trust-remote-code --dtype float16 --max-model-len 262144 --gpu-memory-utilization 0.95 --enable-chunked-prefill --enable-prefix-caching --api-key ${VLLM_API_KEY:-default-key} --served-model-name qwen-coder --enable-auto-tool-choice --tool-call-parser qwen3_coder"
+    VLLM_ARGS=(
+        --tensor-parallel-size 8
+        --trust-remote-code
+        --dtype float16
+        --max-model-len 262144
+        --gpu-memory-utilization 0.95
+        --enable-chunked-prefill
+        --enable-prefix-caching
+        --api-key "${VLLM_API_KEY:-default-key}"
+        --served-model-name qwen-coder
+        --enable-auto-tool-choice
+        --tool-call-parser qwen3_coder
+    )
 elif [ $GPU_COUNT -eq 4 ]; then
     echo "Using Qwen3-Coder-30B for 4x GPU configuration with tensor parallelism"
     export VLLM_MODEL="Qwen/Qwen3-Coder-30B-A3B-Instruct"
-    export VLLM_ARGS="--tensor-parallel-size 4 --dtype float16 --max-model-len 262144 --gpu-memory-utilization 0.95 --max-num-batched-tokens 32768 --enable-chunked-prefill --disable-log-requests --disable-custom-all-reduce --api-key ${VLLM_API_KEY:-default-key} --served-model-name qwen-coder --enable-auto-tool-choice --tool-call-parser qwen3_coder"
+    VLLM_ARGS=(
+        --tensor-parallel-size 4
+        --dtype float16
+        --max-model-len 262144
+        --gpu-memory-utilization 0.95
+        --max-num-batched-tokens 32768
+        --enable-chunked-prefill
+        --disable-log-requests
+        --disable-custom-all-reduce
+        --api-key "${VLLM_API_KEY:-default-key}"
+        --served-model-name qwen-coder
+        --enable-auto-tool-choice
+        --tool-call-parser qwen3_coder
+    )
 else
     echo "Using Qwen3-Coder-30B for 2x GPU configuration with tensor parallelism"
     export VLLM_MODEL="Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8"
-    export VLLM_ARGS="--tensor-parallel-size 2 --quantization fp8 --kv-cache-dtype fp8 --max-model-len 262144 --rope-scaling '{\"rope_type\":\"yarn\",\"factor\":8.0,\"original_max_position_embeddings\":32768}' --gpu-memory-utilization 0.90 --trust-remote-code --api-key ${VLLM_API_KEY:-default-key} --served-model-name qwen-coder --enable-auto-tool-choice --tool-call-parser qwen3_coder"
+    VLLM_ARGS=(
+        --tensor-parallel-size 2
+        --quantization fp8
+        --kv-cache-dtype fp8
+        --max-model-len 262144
+        --rope-scaling '{"rope_type":"yarn","factor":8.0,"original_max_position_embeddings":32768}'
+        --gpu-memory-utilization 0.90
+        --trust-remote-code
+        --api-key "${VLLM_API_KEY:-default-key}"
+        --served-model-name qwen-coder
+        --enable-auto-tool-choice
+        --tool-call-parser qwen3_coder
+    )
 fi
 
 echo "Selected model: $VLLM_MODEL"
@@ -235,7 +272,7 @@ if command -v vllm &> /dev/null; then
     exec vllm serve "$VLLM_MODEL" \
         --host 0.0.0.0 \
         --port 18000 \
-        $(echo $VLLM_ARGS)
+        "${VLLM_ARGS[@]}"
 else
     echo "ERROR: vLLM command not found!"
     echo "This entrypoint script requires the vllm/vllm-openai Docker image"
