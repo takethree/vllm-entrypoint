@@ -182,6 +182,7 @@ else
         --rope-scaling '{"rope_type":"yarn","factor":8.0,"original_max_position_embeddings":32768}'
         --gpu-memory-utilization 0.90
         --trust-remote-code
+        --disable-custom-all-reduce
         --api-key "${VLLM_API_KEY:-default-key}"
         --served-model-name qwen-coder
         --enable-auto-tool-choice
